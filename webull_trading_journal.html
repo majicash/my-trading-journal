@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradePulse - Webull Trading Journal & Cloud Sync</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0b0f19">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TradePulse">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2422/2422796.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- PDF.js for PDF text extraction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            900: '#0b0f19',
+                            800: '#111827',
+                            700: '#1f2937',
+                            600: '#374151'
+                        },
+                        profit: '#10b981',
+                        loss: '#f43f5e',
+                        accent: '#6366f1'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 font-sans min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-gray-800 bg-[#0f172a] sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-gradient-to-tr from-indigo-600 to-emerald-500 p-2 rounded-xl text-white font-bold text-xl flex items-center justify-center w-10 h-10 shadow-lg shadow-indigo-500/20">
+                        <i class="fa-solid fa-chart-line me-0"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold text-xl tracking-tight bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">TradePulse<span class="text-indigo-400 text-xs font-mono ml-1 px-1.5 py-0.5 rounded border border-indigo-500/30 bg-indigo-500/10">CLOUD SYNC</span></span>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="hidden md:flex space-x-1" id="nav-tabs">
+                    <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-white bg-indigo-600 shadow-md">
+                        <i class="fa-solid fa-chart-pie mr-2"></i>Dashboard
+                    </button>
+                    <button onclick="switchTab('tradelog')" id="tab-tradelog" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-800">
+                        <i class="fa-solid fa-list-check mr-2"></i>Trade Log
+                    </button>
+                    <button onclick="switchTab('playbook')" id="tab-playbook" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-800">
+                        <i class="fa-solid fa-book-bookmark mr-2"></i>Playbook
+                    </button>
+                    <button onclick="switchTab('import')" id="tab-import" class="px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-800">
+                        <i class="fa-solid fa-file-import mr-2"></i>Import / Cloud
+                    </button>
+                </nav>
+
+                <!-- Quick Actions & Auth Status -->
+                <div class="flex items-center space-x-2">
+                    <button onclick="openAuthModal()" id="btn-auth-trigger" class="px-3 py-1.5 text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-800/60 rounded-lg transition-all flex items-center space-x-1.5">
+                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400"></i>
+                        <span id="auth-status-text">Cloud Sign In</span>
+                    </button>
+
+                    <button onclick="exportTradesJSON()" title="Export JSON Backup" class="p-2 text-gray-400 hover:text-indigo-400 hover:bg-gray-800 rounded-lg transition">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+
+                    <button onclick="loadSampleData()" title="Load Sample Data" class="p-2 text-gray-400 hover:text-indigo-400 hover:bg-gray-800 rounded-lg transition">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </button>
+
+                    <button onclick="clearAllData()" title="Reset Journal" class="p-2 text-gray-400 hover:text-rose-400 hover:bg-gray-800 rounded-lg transition">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Bar -->
+        <div class="md:hidden flex border-t border-gray-800 px-2 py-1 justify-around bg-gray-900 text-xs">
+            <button onclick="switchTab('dashboard')" class="p-2 text-indigo-400 flex flex-col items-center"><i class="fa-solid fa-chart-pie text-base"></i>Dashboard</button>
+            <button onclick="switchTab('tradelog')" class="p-2 text-gray-400 flex flex-col items-center"><i class="fa-solid fa-list-check text-base"></i>Trades</button>
+            <button onclick="switchTab('playbook')" class="p-2 text-gray-400 flex flex-col items-center"><i class="fa-solid fa-book-bookmark text-base"></i>Playbook</button>
+            <button onclick="switchTab('import')" class="p-2 text-gray-400 flex flex-col items-center"><i class="fa-solid fa-cloud text-base"></i>Cloud & Backup</button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- TAB 1: DASHBOARD -->
+        <section id="view-dashboard" class="space-y-6">
+            <!-- Key Metrics Overview Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-indigo-500">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider block">Net Realized P&L</span>
+                    <span id="stat-net-pnl" class="text-xl font-bold font-mono text-white mt-1 block">$0.00</span>
+                    <span id="stat-pnl-percent" class="text-xs text-gray-400 font-mono mt-0.5 block">0.00%</span>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-emerald-500">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider block">Win Rate</span>
+                    <span id="stat-win-rate" class="text-xl font-bold font-mono text-emerald-400 mt-1 block">0.0%</span>
+                    <span id="stat-win-loss-count" class="text-xs text-gray-400 font-mono mt-0.5 block">0W - 0L</span>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-blue-500">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider block">Profit Factor</span>
+                    <span id="stat-profit-factor" class="text-xl font-bold font-mono text-white mt-1 block">0.00</span>
+                    <span class="text-xs text-gray-400 mt-0.5 block">Gross W / Gross L</span>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-purple-500">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider block">Total Trades</span>
+                    <span id="stat-total-trades" class="text-xl font-bold font-mono text-white mt-1 block">0</span>
+                    <span id="stat-avg-trade-time" class="text-xs text-gray-400 mt-0.5 block">0 Exe Parsed</span>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-teal-500">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider block">Avg Win</span>
+                    <span id="stat-avg-win" class="text-xl font-bold font-mono text-emerald-400 mt-1 block">$0.00</span>
+                    <span class="text-xs text-gray-400 mt-0.5 block">Per winning trade</span>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-rose-500">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider block">Avg Loss</span>
+                    <span id="stat-avg-loss" class="text-xl font-bold font-mono text-rose-400 mt-1 block">$0.00</span>
+                    <span class="text-xs text-gray-400 mt-0.5 block">Per losing trade</span>
+                </div>
+                <div class="glass-panel p-4 rounded-xl border-l-4 border-l-amber-500">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wider block">Max Drawdown</span>
+                    <span id="stat-max-drawdown" class="text-xl font-bold font-mono text-rose-400 mt-1 block">$0.00</span>
+                    <span class="text-xs text-gray-400 mt-0.5 block">Peak to trough</span>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Cumulative P&L Chart -->
+                <div class="lg:col-span-2 glass-panel p-5 rounded-2xl flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="font-bold text-lg text-white flex items-center">
+                                <i class="fa-solid fa-chart-area text-indigo-400 mr-2"></i>Cumulative Equity Curve
+                            </h3>
+                            <p class="text-xs text-gray-400">Account growth performance over trades</p>
+                        </div>
+                        <div class="flex items-center space-x-2 text-xs">
+                            <span class="inline-flex items-center text-emerald-400 font-mono"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>Cumulative P&L</span>
+                        </div>
+                    </div>
+                    <div class="relative w-full h-72 bg-gray-950/40 rounded-xl p-2 border border-gray-800/80">
+                        <canvas id="pnlChart" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+
+                <!-- Win/Loss Breakdown -->
+                <div class="glass-panel p-5 rounded-2xl flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg text-white flex items-center mb-1">
+                            <i class="fa-solid fa-pie-chart text-indigo-400 mr-2"></i>Win / Loss Breakdown
+                        </h3>
+                        <p class="text-xs text-gray-400 mb-4">Distribution of profitable vs losing trades</p>
+                        
+                        <div class="relative h-44 flex items-center justify-center">
+                            <canvas id="winLossPieChart" class="max-h-full max-w-full"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-800">
+                        <div class="p-3 bg-emerald-950/20 border border-emerald-900/40 rounded-xl text-center">
+                            <span class="text-xs text-emerald-400 font-semibold uppercase">Largest Win</span>
+                            <div id="stat-largest-win" class="text-lg font-bold font-mono text-emerald-400 mt-1">$0.00</div>
+                        </div>
+                        <div class="p-3 bg-rose-950/20 border border-rose-900/40 rounded-xl text-center">
+                            <span class="text-xs text-rose-400 font-semibold uppercase">Largest Loss</span>
+                            <div id="stat-largest-loss" class="text-lg font-bold font-mono text-rose-400 mt-1">$0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily P&L Calendar Heatmap -->
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-white flex items-center">
+                            <i class="fa-regular fa-calendar-days text-indigo-400 mr-2"></i>Trading Calendar Heatmap
+                        </h3>
+                        <p class="text-xs text-gray-400">Daily P&L distribution for the active month</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="changeCalendarMonth(-1)" class="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span id="calendar-month-title" class="text-sm font-bold font-mono text-indigo-300 min-w-[120px] text-center">Month Year</span>
+                        <button onclick="changeCalendarMonth(1)" class="p-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-gray-400 mb-2">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+                <div id="calendar-grid" class="grid grid-cols-7 gap-2"></div>
+            </div>
+        </section>
+
+        <!-- TAB 2: TRADE LOG -->
+        <section id="view-tradelog" class="space-y-6 hidden">
+            <div class="glass-panel p-5 rounded-2xl">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h3 class="font-bold text-xl text-white">Trades Executed</h3>
+                        <p class="text-xs text-gray-400">Parsed round-trip trades auto-matched via Webull executions</p>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <div class="relative flex-1 md:w-56">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-500 text-sm"></i>
+                            <input type="text" id="trade-search" oninput="renderTradeLogTable()" placeholder="Search symbol, tag..." class="w-full bg-gray-900 border border-gray-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <select id="trade-status-filter" onchange="renderTradeLogTable()" class="bg-gray-900 border border-gray-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <option value="ALL">All Outcomes</option>
+                            <option value="WIN">Winners</option>
+                            <option value="LOSS">Losses</option>
+                            <option value="EVEN">Breakeven</option>
+                        </select>
+                        <select id="trade-type-filter" onchange="renderTradeLogTable()" class="bg-gray-900 border border-gray-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <option value="ALL">All Asset Types</option>
+                            <option value="Stock">Stocks</option>
+                            <option value="Option">Options</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-gray-800">
+                    <table class="w-full text-left text-xs font-sans">
+                        <thead class="bg-gray-900/80 text-gray-400 font-mono uppercase text-[11px] border-b border-gray-800">
+                            <tr>
+                                <th class="p-3">Status</th>
+                                <th class="p-3">Date / Time</th>
+                                <th class="p-3">Symbol</th>
+                                <th class="p-3">Type</th>
+                                <th class="p-3 text-right">Qty</th>
+                                <th class="p-3 text-right">Avg Entry</th>
+                                <th class="p-3 text-right">Avg Exit</th>
+                                <th class="p-3 text-right">Net P&L</th>
+                                <th class="p-3">Playbook / Setup</th>
+                                <th class="p-3">Mistake Tags</th>
+                                <th class="p-3 text-center">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trade-table-body" class="divide-y divide-gray-800/60 bg-gray-950/40 font-mono"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: PLAYBOOK & LEAKS -->
+        <section id="view-playbook" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="glass-panel p-5 rounded-2xl">
+                    <h3 class="font-bold text-lg text-white mb-1 flex items-center">
+                        <i class="fa-solid fa-layer-group text-indigo-400 mr-2"></i>Playbook Strategy Stats
+                    </h3>
+                    <p class="text-xs text-gray-400 mb-4">Track which trading setups produce the best expectancy</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-sans">
+                            <thead class="bg-gray-900/60 text-gray-400 uppercase text-[10px] font-mono border-b border-gray-800">
+                                <tr>
+                                    <th class="p-2.5">Setup</th>
+                                    <th class="p-2.5 text-center">Trades</th>
+                                    <th class="p-2.5 text-center">Win Rate</th>
+                                    <th class="p-2.5 text-right">Total P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody id="playbook-stats-body" class="divide-y divide-gray-800/40"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-5 rounded-2xl">
+                    <h3 class="font-bold text-lg text-white mb-1 flex items-center">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-400 mr-2"></i>Mistake & Leak Analysis
+                    </h3>
+                    <p class="text-xs text-gray-400 mb-4">Cost of psychological mistakes and rule breaks</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs font-sans">
+                            <thead class="bg-gray-900/60 text-gray-400 uppercase text-[10px] font-mono border-b border-gray-800">
+                                <tr>
+                                    <th class="p-2.5">Mistake Tag</th>
+                                    <th class="p-2.5 text-center">Occurrences</th>
+                                    <th class="p-2.5 text-right">Total P&L Drain</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mistake-stats-body" class="divide-y divide-gray-800/40"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 4: IMPORT & CLOUD CONFIG -->
+        <section id="view-import" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Dropzone & File Import -->
+                <div class="glass-panel p-6 rounded-2xl space-y-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-white flex items-center">
+                            <i class="fa-solid fa-file-pdf text-rose-400 mr-2"></i>Webull Statement / CSV Upload
+                        </h3>
+                        <p class="text-xs text-gray-400">Upload your downloaded Webull PDF Account Statement or Order CSV</p>
+                    </div>
+
+                    <div id="dropzone" onclick="document.getElementById('file-input').click()" class="border-2 border-dashed border-gray-700 hover:border-indigo-500 bg-gray-950/60 rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 group">
+                        <input type="file" id="file-input" accept=".pdf,.csv,.txt" class="hidden" onchange="handleFileUpload(event)">
+                        <div class="w-12 h-12 rounded-full bg-gray-900 group-hover:bg-indigo-600/20 text-indigo-400 flex items-center justify-center mx-auto mb-3 transition">
+                            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-gray-200 group-hover:text-indigo-300">Click or drag Webull PDF / CSV here</p>
+                        <p class="text-xs text-gray-500 mt-1">Supports Webull Monthly/Daily PDFs and Orders CSV format</p>
+                    </div>
+
+                    <div id="import-status" class="hidden p-3 rounded-xl text-xs font-mono"></div>
+                </div>
+
+                <!-- Backup & Cross-Device Sync Controls -->
+                <div class="glass-panel p-6 rounded-2xl space-y-5 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-lg text-white flex items-center">
+                            <i class="fa-solid fa-cloud-arrow-down text-emerald-400 mr-2"></i>JSON Data Backup & Sync
+                        </h3>
+                        <p class="text-xs text-gray-400 mb-4">Export or import your journal database to transfer between devices without logging in.</p>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="exportTradesJSON()" class="p-3 bg-gray-900 hover:bg-gray-800 border border-gray-700 rounded-xl text-left flex flex-col justify-between transition">
+                                <i class="fa-solid fa-file-export text-indigo-400 text-lg mb-2"></i>
+                                <span class="text-xs font-bold text-white">Export Trades (.JSON)</span>
+                                <span class="text-[10px] text-gray-400 mt-0.5">Download full backup file</span>
+                            </button>
+
+                            <button onclick="document.getElementById('json-input').click()" class="p-3 bg-gray-900 hover:bg-gray-800 border border-gray-700 rounded-xl text-left flex flex-col justify-between transition">
+                                <input type="file" id="json-input" accept=".json" class="hidden" onchange="importTradesJSON(event)">
+                                <i class="fa-solid fa-file-import text-emerald-400 text-lg mb-2"></i>
+                                <span class="text-xs font-bold text-white">Import Backup (.JSON)</span>
+                                <span class="text-[10px] text-gray-400 mt-0.5">Restore trades from file</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Supabase Config Setup Form -->
+                    <div class="pt-4 border-t border-gray-800 space-y-3">
+                        <span class="text-xs font-semibold text-indigo-300 uppercase tracking-wider block">Supabase Project API Setup</span>
+                        <div class="grid grid-cols-1 gap-2">
+                            <input type="text" id="supa-url-input" placeholder="Supabase Project URL (https://xxxx.supabase.co)" class="w-full bg-gray-950 border border-gray-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <input type="password" id="supa-key-input" placeholder="Supabase anon public key" class="w-full bg-gray-950 border border-gray-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <button onclick="saveSupabaseConfig()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl transition">
+                            Save Cloud Settings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Supabase Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 id="auth-modal-title" class="text-lg font-bold text-white">Cloud Sync Sign In</h3>
+                <button onclick="closeAuthModal()" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-semibold text-gray-300 block mb-1">Email</label>
+                    <input type="email" id="auth-email" placeholder="trader@example.com" class="w-full bg-gray-950 border border-gray-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="text-xs font-semibold text-gray-300 block mb-1">Password</label>
+                    <input type="password" id="auth-password" placeholder="••••••••" class="w-full bg-gray-950 border border-gray-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="flex flex-col space-y-2 pt-2">
+                <button onclick="handleCloudSignIn()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-lg transition">Sign In</button>
+                <button onclick="handleCloudSignUp()" class="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium text-xs rounded-xl transition">Create Account</button>
+                <button onclick="handleCloudSignOut()" id="btn-cloud-signout" class="w-full py-2 bg-rose-900/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 text-xs rounded-xl transition hidden">Sign Out</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trade Detail Modal -->
+    <div id="trade-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <div class="flex items-center space-x-3">
+                    <span id="modal-trade-badge" class="px-2.5 py-1 rounded text-xs font-bold font-mono">WIN</span>
+                    <h3 id="modal-trade-title" class="text-lg font-bold text-white font-mono">AAPL - Long Call</h3>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                <div class="bg-gray-950 p-2.5 rounded-xl border border-gray-800">
+                    <span class="text-gray-500 text-[10px]">TOTAL P&L</span>
+                    <div id="modal-pnl" class="text-sm font-bold mt-0.5">$0.00</div>
+                </div>
+                <div class="bg-gray-950 p-2.5 rounded-xl border border-gray-800">
+                    <span class="text-gray-500 text-[10px]">AVG ENTRY</span>
+                    <div id="modal-entry" class="text-sm font-bold text-gray-200 mt-0.5">$0.00</div>
+                </div>
+                <div class="bg-gray-950 p-2.5 rounded-xl border border-gray-800">
+                    <span class="text-gray-500 text-[10px]">AVG EXIT</span>
+                    <div id="modal-exit" class="text-sm font-bold text-gray-200 mt-0.5">$0.00</div>
+                </div>
+                <div class="bg-gray-950 p-2.5 rounded-xl border border-gray-800">
+                    <span class="text-gray-500 text-[10px]">SHARES/CONTRACTS</span>
+                    <div id="modal-qty" class="text-sm font-bold text-gray-200 mt-0.5">0</div>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-xs font-semibold text-gray-300">Playbook Setup</label>
+                <select id="modal-playbook-select" class="w-full bg-gray-950 border border-gray-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                    <option value="None">None / General</option>
+                    <option value="Breakout">Breakout / Continuation</option>
+                    <option value="Gap & Go">Gap & Go</option>
+                    <option value="VWAP Reversal">VWAP Reversal</option>
+                    <option value="Dip Buy">Dip Buy / Trend Pullback</option>
+                    <option value="Options Scalp">Options Scalp</option>
+                </select>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-xs font-semibold text-gray-300">Psychology & Mistake Tags</label>
+                <div class="flex flex-wrap gap-2" id="modal-tags-container"></div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-xs font-semibold text-gray-300">Trade Notes</label>
+                <textarea id="modal-notes" rows="4" placeholder="Execution thoughts..." class="w-full bg-gray-950 border border-gray-800 rounded-xl p-3 text-xs text-gray-200 focus:outline-none focus:border-indigo-500"></textarea>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-3 border-t border-gray-800">
+                <button onclick="closeModal()" class="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300">Cancel</button>
+                <button onclick="saveModalTradeDetails()" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-lg">Save Journal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-900 border border-indigo-500/40 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs font-medium flex items-center space-x-2 transition-all transform translate-y-12 opacity-0 pointer-events-none">
+        <i class="fa-solid fa-circle-check text-indigo-400"></i>
+        <span id="toast-message">Notification message</span>
+    </div>
+
+    <script>
+        // App State
+        let pairedTrades = [];
+        let activeMonthOffset = 0;
+        let editingTradeId = null;
+        let supabaseClient = null;
+        let currentUser = null;
+
+        const MISTAKE_OPTIONS = ['FOMO', 'Chased Entry', 'Revenge Trade', 'Moved Stop Loss', 'Over-Leveraged', 'Early Exit', 'Hesitated'];
+
+        window.onload = function() {
+            initSupabase();
+            loadTradesLocal();
+        };
+
+        // Initialize Supabase Client
+        function initSupabase() {
+            const url = localStorage.getItem('supabase_url') || '';
+            const key = localStorage.getItem('supabase_key') || '';
+
+            document.getElementById('supa-url-input').value = url;
+            document.getElementById('supa-key-input').value = key;
+
+            if (url && key && window.supabase) {
+                try {
+                    supabaseClient = window.supabase.createClient(url, key);
+                    checkCloudUser();
+                } catch(e) {
+                    console.log("Supabase initialization deferred until valid keys provided.");
+                }
+            }
+        }
+
+        function saveSupabaseConfig() {
+            const url = document.getElementById('supa-url-input').value.trim();
+            const key = document.getElementById('supa-key-input').value.trim();
+
+            localStorage.setItem('supabase_url', url);
+            localStorage.setItem('supabase_key', key);
+
+            initSupabase();
+            showToast("Cloud configuration saved!");
+        }
+
+        async function checkCloudUser() {
+            if (!supabaseClient) return;
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (user) {
+                currentUser = user;
+                document.getElementById('auth-status-text').innerText = user.email.split('@')[0];
+                document.getElementById('btn-cloud-signout').classList.remove('hidden');
+                syncFromCloud();
+            }
+        }
+
+        async function handleCloudSignIn() {
+            if (!supabaseClient) {
+                showToast("Please enter Supabase URL & Key under Import/Cloud tab first.");
+                return;
+            }
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                showToast(error.message);
+            } else {
+                currentUser = data.user;
+                document.getElementById('auth-status-text').innerText = currentUser.email.split('@')[0];
+                closeAuthModal();
+                showToast("Signed into cloud database!");
+                syncFromCloud();
+            }
+        }
+
+        async function handleCloudSignUp() {
+            if (!supabaseClient) {
+                showToast("Please enter Supabase URL & Key under Import/Cloud tab first.");
+                return;
+            }
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) {
+                showToast(error.message);
+            } else {
+                showToast("Account created! Check email or sign in.");
+            }
+        }
+
+        async function handleCloudSignOut() {
+            if (supabaseClient) {
+                await supabaseClient.auth.signOut();
+                currentUser = null;
+                document.getElementById('auth-status-text').innerText = "Cloud Sign In";
+                document.getElementById('btn-cloud-signout').classList.add('hidden');
+                closeAuthModal();
+                showToast("Signed out from cloud.");
+            }
+        }
+
+        async function syncFromCloud() {
+            if (!supabaseClient || !currentUser) return;
+            const { data, error } = await supabaseClient
+                .from('trades')
+                .select('*')
+                .eq('user_id', currentUser.id);
+
+            if (!error && data) {
+                pairedTrades = data.map(d => d.trade_data);
+                localStorage.setItem('tradezella_webull_trades', JSON.stringify(pairedTrades));
+                updateApp();
+            }
+        }
+
+        async function saveTradesToStorage() {
+            localStorage.setItem('tradezella_webull_trades', JSON.stringify(pairedTrades));
+
+            if (supabaseClient && currentUser) {
+                // Batch upside sync to Supabase
+                const payload = pairedTrades.map(t => ({
+                    id: t.id,
+                    user_id: currentUser.id,
+                    trade_data: t
+                }));
+
+                await supabaseClient.from('trades').upsert(payload);
+            }
+            updateApp();
+        }
+
+        function loadTradesLocal() {
+            const saved = localStorage.getItem('tradezella_webull_trades');
+            if (saved) {
+                try { pairedTrades = JSON.parse(saved); } catch(e) { pairedTrades = []; }
+            }
+            if (pairedTrades.length === 0) loadSampleData();
+            else updateApp();
+        }
+
+        // JSON Data Export & Import Features
+        function exportTradesJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pairedTrades, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `tradepulse_backup_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast("Exported trades JSON file!");
+        }
+
+        function importTradesJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        pairedTrades = imported;
+                        saveTradesToStorage();
+                        showToast(`Restored ${imported.length} trades from JSON backup!`);
+                    }
+                } catch(err) {
+                    showToast("Invalid JSON backup file.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Navigation Tabs Switch
+        function switchTab(tabId) {
+            ['dashboard', 'tradelog', 'playbook', 'import'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-${t}`);
+                if (btn) btn.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:text-white hover:bg-gray-800";
+            });
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            if (activeBtn) activeBtn.className = "px-4 py-2 rounded-lg text-sm font-medium transition-colors text-white bg-indigo-600 shadow-md";
+
+            if (tabId === 'dashboard') renderCharts();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = msg;
+            toast.classList.remove('translate-y-12', 'opacity-0', 'pointer-events-none');
+            setTimeout(() => {
+                toast.classList.add('translate-y-12', 'opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
+        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+
+        // Webull PDF / Text Statement Parser
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const statusDiv = document.getElementById('import-status');
+            statusDiv.classList.remove('hidden');
+            statusDiv.className = "p-3 rounded-xl text-xs font-mono bg-indigo-950/40 text-indigo-300 border border-indigo-800";
+            statusDiv.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-2"></i> Parsing statement file: ${file.name}...`;
+
+            if (file.name.endsWith('.pdf')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const typedarray = new Uint8Array(e.target.result);
+                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                        let textPromises = [];
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            textPromises.push(pdf.getPage(i).then(page => page.getTextContent()));
+                        }
+                        return Promise.all(textPromises);
+                    }).then(textContents => {
+                        let fullText = "";
+                        textContents.forEach(content => {
+                            content.items.forEach(item => { fullText += item.str + " "; });
+                            fullText += "\n";
+                        });
+                        parsePastedText(fullText);
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                const reader = new FileReader();
+                reader.onload = (e) => parseCSVOrText(e.target.result);
+                reader.readAsText(file);
+            }
+        }
+
+        function parsePastedText(text) {
+            if (!text) return;
+            const parsedExecutions = [];
+            const regexStandard = /(?:([A-Z]{1,5})\s+)?(BUY|SELL|Buy|Sell)\s+(\d+)\s+(?:@\s*)?\$?([\d.]+)\s+(?:on\s+)?(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})\s*([\d:]+)?/g;
+
+            let match;
+            while ((match = regexStandard.exec(text)) !== null) {
+                const symbol = match[1] || "TRADE";
+                const action = match[2].toUpperCase();
+                const qty = parseInt(match[3], 10);
+                const price = parseFloat(match[4]);
+                const dateStr = match[5];
+                const timeStr = match[6] || "09:30:00";
+                const isOption = symbol.length > 5 || text.includes('CALL') || text.includes('PUT');
+
+                parsedExecutions.push({
+                    symbol: symbol,
+                    action: action,
+                    qty: qty,
+                    price: price,
+                    datetime: new Date(`${dateStr} ${timeStr}`).toISOString(),
+                    assetType: isOption ? 'Option' : 'Stock'
+                });
+            }
+
+            if (parsedExecutions.length > 0) {
+                processExecutionsToTrades(parsedExecutions);
+                showToast(`Parsed ${parsedExecutions.length} executions into trades!`);
+                switchTab('tradelog');
+            } else {
+                showToast("Could not parse executions automatically.");
+            }
+        }
+
+        function parseCSVOrText(content) {
+            const lines = content.split('\n');
+            const parsedExecutions = [];
+
+            lines.forEach((line, index) => {
+                if (index === 0 && line.toLowerCase().includes('symbol')) return;
+                const cols = line.split(',').map(c => c.trim().replace(/"/g, ''));
+                if (cols.length >= 4) {
+                    const symbol = cols[0] || cols[1];
+                    const action = cols.find(c => /BUY|SELL/i.test(c)) || 'BUY';
+                    const qty = parseInt(cols.find(c => /^\d+$/.test(c)) || '100');
+                    const price = parseFloat(cols.find(c => /^\d+\.\d+$/.test(c)) || '10.0');
+
+                    if (symbol && price) {
+                        parsedExecutions.push({
+                            symbol: symbol.toUpperCase(),
+                            action: action.toUpperCase(),
+                            qty: qty,
+                            price: price,
+                            datetime: new Date().toISOString(),
+                            assetType: symbol.length > 5 ? 'Option' : 'Stock'
+                        });
+                    }
+                }
+            });
+
+            if (parsedExecutions.length > 0) {
+                processExecutionsToTrades(parsedExecutions);
+                showToast(`Imported ${parsedExecutions.length} trades!`);
+                switchTab('tradelog');
+            }
+        }
+
+        // FIFO Matching Engine
+        function processExecutionsToTrades(executions) {
+            executions.sort((a, b) => new Date(a.datetime) - new Date(b.datetime));
+            const newTrades = [];
+            const inventory = {};
+
+            executions.forEach(exec => {
+                if (!inventory[exec.symbol]) inventory[exec.symbol] = [];
+
+                if (exec.action === 'BUY') {
+                    inventory[exec.symbol].push({...exec});
+                } else if (exec.action === 'SELL') {
+                    let sellQtyRemaining = exec.qty;
+
+                    while (sellQtyRemaining > 0 && inventory[exec.symbol].length > 0) {
+                        const buyExec = inventory[exec.symbol][0];
+                        const matchedQty = Math.min(sellQtyRemaining, buyExec.qty);
+                        const mult = exec.assetType === 'Option' ? 100 : 1;
+                        const pnl = (exec.price - buyExec.price) * matchedQty * mult;
+
+                        newTrades.push({
+                            id: 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                            symbol: exec.symbol,
+                            assetType: exec.assetType,
+                            qty: matchedQty,
+                            entryPrice: buyExec.price,
+                            exitPrice: exec.price,
+                            pnl: parseFloat(pnl.toFixed(2)),
+                            entryTime: buyExec.datetime,
+                            exitTime: exec.datetime,
+                            playbook: 'Breakout',
+                            mistakes: [],
+                            notes: ''
+                        });
+
+                        buyExec.qty -= matchedQty;
+                        sellQtyRemaining -= matchedQty;
+                        if (buyExec.qty <= 0) inventory[exec.symbol].shift();
+                    }
+                }
+            });
+
+            pairedTrades = [...pairedTrades, ...newTrades];
+            saveTradesToStorage();
+        }
+
+        function loadSampleData() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+
+            pairedTrades = [
+                { id: 't1', symbol: 'NVDA', assetType: 'Stock', qty: 100, entryPrice: 115.20, exitPrice: 122.50, pnl: 730.00, entryTime: `${year}-${month}-02T09:35:00`, exitTime: `${year}-${month}-02T10:15:00`, playbook: 'Breakout', mistakes: [], notes: 'Clean high breakout.' },
+                { id: 't2', symbol: 'TSLA', assetType: 'Option', qty: 5, entryPrice: 3.50, exitPrice: 5.80, pnl: 1150.00, entryTime: `${year}-${month}-04T09:45:00`, exitTime: `${year}-${month}-04T11:00:00`, playbook: 'Gap & Go', mistakes: [], notes: 'Caught momentum after news catalyst.' },
+                { id: 't3', symbol: 'SPY', assetType: 'Option', qty: 10, entryPrice: 2.10, exitPrice: 1.40, pnl: -700.00, entryTime: `${year}-${month}-05T10:30:00`, exitTime: `${year}-${month}-05T10:45:00`, playbook: 'VWAP Reversal', mistakes: ['FOMO', 'Chased Entry'], notes: 'Entered late after move was extended.' },
+                { id: 't4', symbol: 'AMD', assetType: 'Stock', qty: 200, entryPrice: 155.00, exitPrice: 158.40, pnl: 680.00, entryTime: `${year}-${month}-08T09:31:00`, exitTime: `${year}-${month}-08T09:50:00`, playbook: 'Breakout', mistakes: [], notes: 'Solid ORB execution.' }
+            ];
+
+            saveTradesToStorage();
+            showToast("Sample data loaded!");
+        }
+
+        function clearAllData() {
+            pairedTrades = [];
+            localStorage.removeItem('tradezella_webull_trades');
+            updateApp();
+            showToast("Journal cleared!");
+        }
+
+        function updateApp() {
+            calculateMetrics();
+            renderTradeLogTable();
+            renderPlaybookStats();
+            renderMistakeStats();
+            renderCalendarHeatmap();
+            renderCharts();
+        }
+
+        function calculateMetrics() {
+            const totalTrades = pairedTrades.length;
+            if (totalTrades === 0) return;
+
+            let netPnL = 0, wins = 0, losses = 0, grossWin = 0, grossLoss = 0, maxWin = 0, maxLoss = 0, peak = 0, maxDrawdown = 0, runningPnL = 0;
+
+            pairedTrades.forEach(t => {
+                netPnL += t.pnl;
+                runningPnL += t.pnl;
+                if (runningPnL > peak) peak = runningPnL;
+                const dd = peak - runningPnL;
+                if (dd > maxDrawdown) maxDrawdown = dd;
+
+                if (t.pnl > 0) {
+                    wins++; grossWin += t.pnl;
+                    if (t.pnl > maxWin) maxWin = t.pnl;
+                } else if (t.pnl < 0) {
+                    losses++; grossLoss += Math.abs(t.pnl);
+                    if (t.pnl < maxLoss) maxLoss = t.pnl;
+                }
+            });
+
+            const winRate = ((wins / totalTrades) * 100).toFixed(1);
+            const profitFactor = grossLoss > 0 ? (grossWin / grossLoss).toFixed(2) : (grossWin > 0 ? '∞' : '0.00');
+
+            const pnlElem = document.getElementById('stat-net-pnl');
+            pnlElem.innerText = `${netPnL >= 0 ? '+' : ''}$${netPnL.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            pnlElem.className = `text-xl font-bold font-mono mt-1 block ${netPnL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            document.getElementById('stat-win-rate').innerText = `${winRate}%`;
+            document.getElementById('stat-win-loss-count').innerText = `${wins}W - ${losses}L`;
+            document.getElementById('stat-profit-factor').innerText = profitFactor;
+            document.getElementById('stat-total-trades').innerText = totalTrades;
+            document.getElementById('stat-avg-win').innerText = `+$${(wins > 0 ? grossWin / wins : 0).toFixed(0)}`;
+            document.getElementById('stat-avg-loss').innerText = `-$${(losses > 0 ? grossLoss / losses : 0).toFixed(0)}`;
+            document.getElementById('stat-max-drawdown').innerText = `-$${maxDrawdown.toLocaleString()}`;
+            document.getElementById('stat-largest-win').innerText = `+$${maxWin.toLocaleString()}`;
+            document.getElementById('stat-largest-loss').innerText = `$${maxLoss.toLocaleString()}`;
+        }
+
+        function renderTradeLogTable() {
+            const tbody = document.getElementById('trade-table-body');
+            const search = document.getElementById('trade-search').value.toLowerCase();
+            const statusFilter = document.getElementById('trade-status-filter').value;
+            const typeFilter = document.getElementById('trade-type-filter').value;
+
+            tbody.innerHTML = '';
+
+            const filtered = pairedTrades.filter(t => {
+                const matchesSearch = t.symbol.toLowerCase().includes(search) || (t.notes && t.notes.toLowerCase().includes(search));
+                const matchesStatus = statusFilter === 'ALL' || (statusFilter === 'WIN' && t.pnl > 0) || (statusFilter === 'LOSS' && t.pnl < 0);
+                const matchesType = typeFilter === 'ALL' || t.assetType === typeFilter;
+                return matchesSearch && matchesStatus && matchesType;
+            });
+
+            filtered.sort((a, b) => new Date(b.entryTime) - new Date(a.entryTime)).forEach(t => {
+                const isWin = t.pnl > 0;
+                const isLoss = t.pnl < 0;
+                const badgeClass = isWin ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : isLoss ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-gray-500/10 text-gray-400';
+                const dateFormatted = new Date(t.entryTime).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-900/60 transition cursor-pointer border-b border-gray-800/40";
+                tr.onclick = (e) => { if (!e.target.closest('button')) openTradeModal(t.id); };
+
+                tr.innerHTML = `
+                    <td class="p-3"><span class="px-2 py-0.5 rounded border text-[10px] font-bold ${badgeClass}">${isWin ? 'WIN' : isLoss ? 'LOSS' : 'EVEN'}</span></td>
+                    <td class="p-3 text-gray-300">${dateFormatted}</td>
+                    <td class="p-3 font-bold text-white">${t.symbol}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-gray-800 text-gray-300 text-[10px]">${t.assetType}</span></td>
+                    <td class="p-3 text-right text-gray-200">${t.qty}</td>
+                    <td class="p-3 text-right text-gray-300">$${t.entryPrice.toFixed(2)}</td>
+                    <td class="p-3 text-right text-gray-300">$${t.exitPrice.toFixed(2)}</td>
+                    <td class="p-3 text-right font-bold ${isWin ? 'text-emerald-400' : isLoss ? 'text-rose-400' : 'text-gray-400'}">
+                        ${isWin ? '+' : ''}$${t.pnl.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    </td>
+                    <td class="p-3"><span class="px-2 py-0.5 rounded bg-indigo-950/60 text-indigo-300 border border-indigo-800/40 text-[10px]">${t.playbook}</span></td>
+                    <td class="p-3">${(t.mistakes || []).map(m => `<span class="px-1.5 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800/50 text-[10px] mr-1">${m}</span>`).join('') || '-'}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="deleteTrade('${t.id}')" class="p-1 text-gray-500 hover:text-rose-400"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderPlaybookStats() {
+            const tbody = document.getElementById('playbook-stats-body');
+            tbody.innerHTML = '';
+            const map = {};
+
+            pairedTrades.forEach(t => {
+                const pb = t.playbook || 'General';
+                if (!map[pb]) map[pb] = { count: 0, wins: 0, pnl: 0 };
+                map[pb].count++;
+                if (t.pnl > 0) map[pb].wins++;
+                map[pb].pnl += t.pnl;
+            });
+
+            Object.keys(map).forEach(pb => {
+                const d = map[pb];
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-900/40 font-mono";
+                tr.innerHTML = `
+                    <td class="p-2.5 font-sans font-medium text-white">${pb}</td>
+                    <td class="p-2.5 text-center text-gray-300">${d.count}</td>
+                    <td class="p-2.5 text-center ${((d.wins/d.count)*100) >= 50 ? 'text-emerald-400' : 'text-rose-400'}">${((d.wins/d.count)*100).toFixed(0)}%</td>
+                    <td class="p-2.5 text-right font-bold ${d.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${d.pnl >= 0 ? '+' : ''}$${d.pnl.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderMistakeStats() {
+            const tbody = document.getElementById('mistake-stats-body');
+            tbody.innerHTML = '';
+            const map = {};
+
+            pairedTrades.forEach(t => {
+                (t.mistakes || []).forEach(m => {
+                    if (!map[m]) map[m] = { count: 0, drain: 0 };
+                    map[m].count++;
+                    map[m].drain += t.pnl;
+                });
+            });
+
+            Object.keys(map).forEach(m => {
+                const d = map[m];
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-900/40 font-mono";
+                tr.innerHTML = `
+                    <td class="p-2.5 font-sans font-medium text-rose-300">${m}</td>
+                    <td class="p-2.5 text-center text-gray-300">${d.count}</td>
+                    <td class="p-2.5 text-right font-bold ${d.drain >= 0 ? 'text-emerald-400' : 'text-rose-400'}">$${d.drain.toLocaleString()}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function changeCalendarMonth(offset) {
+            activeMonthOffset += offset;
+            renderCalendarHeatmap();
+        }
+
+        function renderCalendarHeatmap() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            const now = new Date();
+            const targetDate = new Date(now.getFullYear(), now.getMonth() + activeMonthOffset, 1);
+            const year = targetDate.getFullYear();
+            const month = targetDate.getMonth();
+
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById('calendar-month-title').innerText = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            const dailyPnL = {};
+            pairedTrades.forEach(t => {
+                const d = new Date(t.entryTime);
+                if (d.getFullYear() === year && d.getMonth() === month) {
+                    const day = d.getDate();
+                    dailyPnL[day] = (dailyPnL[day] || 0) + t.pnl;
+                }
+            });
+
+            for (let i = 0; i < firstDay; i++) {
+                grid.appendChild(document.createElement('div'));
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const pnl = dailyPnL[day];
+                const tile = document.createElement('div');
+                let bgClass = "bg-gray-950/60 border-gray-800/60";
+                let textClass = "text-gray-400";
+                let pnlText = "";
+
+                if (pnl !== undefined) {
+                    if (pnl > 0) {
+                        bgClass = "bg-emerald-950/40 border-emerald-800/60";
+                        textClass = "text-emerald-400";
+                        pnlText = `+$${pnl.toFixed(0)}`;
+                    } else if (pnl < 0) {
+                        bgClass = "bg-rose-950/40 border-rose-800/60";
+                        textClass = "text-rose-400";
+                        pnlText = `-$${Math.abs(pnl).toFixed(0)}`;
+                    }
+                }
+
+                tile.className = `h-16 rounded-xl border p-1.5 flex flex-col justify-between ${bgClass}`;
+                tile.innerHTML = `
+                    <div class="text-[10px] font-mono text-gray-500 font-bold">${day}</div>
+                    <div class="text-xs font-mono font-bold text-right ${textClass}">${pnlText}</div>
+                `;
+                grid.appendChild(tile);
+            }
+        }
+
+        function renderCharts() {
+            renderEquityChart();
+            renderPieChart();
+        }
+
+        function renderEquityChart() {
+            const canvas = document.getElementById('pnlChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (pairedTrades.length === 0) return;
+
+            const sorted = [...pairedTrades].sort((a, b) => new Date(a.entryTime) - new Date(b.entryTime));
+            let cum = 0;
+            const points = [{ pnl: 0 }];
+            sorted.forEach(t => { cum += t.pnl; points.push({ pnl: cum }); });
+
+            const padding = 35;
+            const w = canvas.width - padding * 2;
+            const h = canvas.height - padding * 2;
+
+            const minPnL = Math.min(0, ...points.map(p => p.pnl));
+            const maxPnL = Math.max(100, ...points.map(p => p.pnl));
+            const range = (maxPnL - minPnL) || 1;
+
+            const coords = points.map((p, idx) => ({
+                x: padding + (w / (points.length - 1)) * idx,
+                y: padding + h - ((p.pnl - minPnL) / range) * h
+            }));
+
+            ctx.beginPath();
+            coords.forEach((c, i) => { if (i === 0) ctx.moveTo(c.x, c.y); else ctx.lineTo(c.x, c.y); });
+            ctx.strokeStyle = cum >= 0 ? "#10b981" : "#f43f5e";
+            ctx.lineWidth = 2.5;
+            ctx.stroke();
+        }
+
+        function renderPieChart() {
+            const canvas = document.getElementById('winLossPieChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            canvas.width = 160; canvas.height = 160;
+
+            const wins = pairedTrades.filter(t => t.pnl > 0).length;
+            const total = pairedTrades.length;
+
+            ctx.clearRect(0, 0, 160, 160);
+            if (total === 0) return;
+
+            const winAngle = (wins / total) * Math.PI * 2;
+
+            ctx.beginPath();
+            ctx.arc(80, 80, 70, 0, Math.PI * 2);
+            ctx.fillStyle = "#f43f5e";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(80, 80);
+            ctx.arc(80, 80, 70, -Math.PI/2, -Math.PI/2 + winAngle);
+            ctx.fillStyle = "#10b981";
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(80, 80, 45, 0, Math.PI * 2);
+            ctx.fillStyle = "#0b0f19";
+            ctx.fill();
+        }
+
+        function openTradeModal(id) {
+            editingTradeId = id;
+            const trade = pairedTrades.find(t => t.id === id);
+            if (!trade) return;
+
+            document.getElementById('modal-trade-title').innerText = `${trade.symbol} (${trade.assetType})`;
+            document.getElementById('modal-pnl').innerText = `$${trade.pnl.toFixed(2)}`;
+            document.getElementById('modal-entry').innerText = `$${trade.entryPrice.toFixed(2)}`;
+            document.getElementById('modal-exit').innerText = `$${trade.exitPrice.toFixed(2)}`;
+            document.getElementById('modal-qty').innerText = trade.qty;
+            document.getElementById('modal-playbook-select').value = trade.playbook || 'None';
+            document.getElementById('modal-notes').value = trade.notes || '';
+
+            const tagsContainer = document.getElementById('modal-tags-container');
+            tagsContainer.innerHTML = '';
+            MISTAKE_OPTIONS.forEach(opt => {
+                const isSelected = (trade.mistakes || []).includes(opt);
+                const btn = document.createElement('button');
+                btn.className = `px-2.5 py-1 rounded-lg text-xs font-semibold border ${isSelected ? 'bg-rose-950 text-rose-300 border-rose-600' : 'bg-gray-950 text-gray-400 border-gray-800'}`;
+                btn.innerText = opt;
+                btn.onclick = () => {
+                    if (!trade.mistakes) trade.mistakes = [];
+                    if (trade.mistakes.includes(opt)) trade.mistakes = trade.mistakes.filter(m => m !== opt);
+                    else trade.mistakes.push(opt);
+                    openTradeModal(id);
+                };
+                tagsContainer.appendChild(btn);
+            });
+
+            document.getElementById('trade-modal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('trade-modal').classList.add('hidden'); }
+
+        function saveModalTradeDetails() {
+            if (!editingTradeId) return;
+            const trade = pairedTrades.find(t => t.id === editingTradeId);
+            if (trade) {
+                trade.playbook = document.getElementById('modal-playbook-select').value;
+                trade.notes = document.getElementById('modal-notes').value;
+                saveTradesToStorage();
+            }
+            closeModal();
+        }
+
+        function deleteTrade(id) {
+            pairedTrades = pairedTrades.filter(t => t.id !== id);
+            saveTradesToStorage();
+        }
+
+        window.onresize = () => renderCharts();
+    </script>
+</body>
+</html>
