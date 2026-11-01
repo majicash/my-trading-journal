@@ -1,9 +1,10 @@
+<!-- TradePulse App | Version: 2.2 | Built: 2026-11-01 21:16 GMT -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TradePulse - Webull Trading Journal</title>
+  <title>TradePulse v2.2 - Webull Trading Journal</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
@@ -23,6 +24,7 @@
     header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
     .logo { font-size: 1.4rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 0.5rem; }
     .logo span { color: var(--accent-blue); }
+    .build-tag { font-size: 0.7rem; color: #60a5fa; background: rgba(59, 130, 246, 0.15); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(59, 130, 246, 0.3); }
     nav { display: flex; gap: 1rem; }
     .nav-btn { background: transparent; border: none; color: var(--text-sub); padding: 0.5rem 1rem; cursor: pointer; border-radius: 6px; font-weight: 600; font-size: 0.95rem; transition: 0.2s; }
     .nav-btn.active, .nav-btn:hover { color: #fff; background: rgba(255,255,255,0.05); }
@@ -64,11 +66,14 @@
 <body>
 
   <header>
-    <div class="logo">⚡ Trade<span>Pulse</span> <small style="font-size: 0.7rem; color: var(--text-sub);">v2.1</small></div>
+    <div class="logo">
+      ⚡ Trade<span>Pulse</span> 
+      <span class="build-tag">v2.2 | 2026-11-01 21:16 GMT</span>
+    </div>
     <nav>
-      <button class="nav-btn active" onclick="switchTab('dashboard')">Dashboard</button>
-      <button class="nav-btn" onclick="switchTab('tradelog')">Trade Log</button>
-      <button class="nav-btn" onclick="switchTab('import')">Import / Data</button>
+      <button class="nav-btn active" onclick="switchTab(event, 'dashboard')">Dashboard</button>
+      <button class="nav-btn" onclick="switchTab(event, 'tradelog')">Trade Log</button>
+      <button class="nav-btn" onclick="switchTab(event, 'import')">Import / Data</button>
     </nav>
   </header>
 
@@ -123,7 +128,7 @@
       <div class="upload-container">
         <div class="drop-box" id="dropZone">
           <h2 style="margin-bottom: 0.5rem;">Webull Statement / CSV Upload</h2>
-          <p style="color: var(--text-sub); margin-bottom: 1rem;">Drag and drop single/multiple Webull CSVs, GUID exports, or folders here.</p>
+          <p style="color: var(--text-sub); margin-bottom: 1rem;">Drag and drop Webull CSVs or GUID exports directly into this box.</p>
           <div class="btn-group">
             <button class="btn" onclick="document.getElementById('fileInput').click()">Select Files</button>
             <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">Select Folder</button>
@@ -147,6 +152,7 @@
   </main>
 
   <script>
+    console.log("TradePulse v2.2 Initialized - Build 2026-11-01 21:16 GMT");
     let trades = JSON.parse(localStorage.getItem('tp_trades') || '[]');
     let equityChart, winLossChart;
 
@@ -156,11 +162,11 @@
       setupFileHandlers();
     });
 
-    function switchTab(tabId) {
+    function switchTab(evt, tabId) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(tabId).classList.add('active');
-      event.target.classList.add('active');
+      if (evt && evt.target) evt.target.classList.add('active');
     }
 
     function setupFileHandlers() {
@@ -205,7 +211,11 @@
       if (totalParsedExecutions.length > 0) {
         matchFIFOTrades(totalParsedExecutions);
         alert(`Successfully imported ${totalParsedExecutions.length} trade executions across ${files.length} file(s)!`);
-        switchTab('dashboard');
+        switchTab(null, 'dashboard');
+        // Set active styling on dashboard tab button
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          btn.classList.toggle('active', btn.innerText.includes('Dashboard'));
+        });
       } else {
         alert("No valid trade executions found in the uploaded file(s).");
       }
@@ -293,7 +303,6 @@
       const holdings = {};
       const newTrades = [];
 
-      // Sort chronologically if needed
       executions.forEach(exec => {
         const sym = exec.symbol;
         if (!holdings[sym]) holdings[sym] = [];
@@ -411,7 +420,7 @@
       if (execs.length) {
         matchFIFOTrades(execs);
         alert(`Parsed ${execs.length} executions from text.`);
-        switchTab('dashboard');
+        switchTab(null, 'dashboard');
       } else {
         alert("Could not parse valid executions from text.");
       }
