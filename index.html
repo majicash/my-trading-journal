@@ -1,10 +1,10 @@
-<!-- TradePulse App | Version: 2.2 | Built: 2026-11-01 21:16 GMT -->
+<!-- TradePulse App | Version: 2.3 | Built: 2026-11-01 21:20 GMT -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TradePulse v2.2 - Webull Trading Journal</title>
+  <title>TradePulse v2.3 - Webull Trading Journal</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
@@ -34,17 +34,29 @@
     .tab-content.active { display: block; }
 
     /* Stat Cards */
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
     .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; }
     .stat-card .label { color: var(--text-sub); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
     .stat-card .value { font-size: 1.6rem; font-weight: 700; margin-top: 0.4rem; }
     .text-green { color: var(--green); }
     .text-red { color: var(--red); }
 
-    /* Charts */
+    /* Charts Grid */
     .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
     .chart-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; }
     .chart-card h3 { font-size: 1.1rem; margin-bottom: 1rem; color: var(--text-sub); }
+
+    /* Calendar Heatmap Section */
+    .calendar-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; margin-bottom: 2rem; }
+    .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+    .cal-day-name { text-align: center; font-size: 0.8rem; color: var(--text-sub); padding-bottom: 4px; font-weight: 600; }
+    .cal-day { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 6px; min-height: 70px; padding: 6px; display: flex; flex-direction: column; justify-content: space-between; font-size: 0.8rem; }
+    .cal-day.empty { background: transparent; border: none; }
+    .cal-day .date-num { color: var(--text-sub); font-weight: 600; }
+    .cal-day .day-pnl { font-weight: 700; font-size: 0.85rem; }
+    .cal-day.win-day { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.4); }
+    .cal-day.loss-day { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); }
 
     /* Upload Area */
     .upload-container { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
@@ -68,7 +80,7 @@
   <header>
     <div class="logo">
       ⚡ Trade<span>Pulse</span> 
-      <span class="build-tag">v2.2 | 2026-11-01 21:16 GMT</span>
+      <span class="build-tag">v2.3 | 2026-11-01 21:20 GMT</span>
     </div>
     <nav>
       <button class="nav-btn active" onclick="switchTab(event, 'dashboard')">Dashboard</button>
@@ -99,6 +111,19 @@
           <canvas id="winLossChart" height="180"></canvas>
         </div>
       </div>
+
+      <!-- RESTORED CALENDAR HEATMAP -->
+      <div class="calendar-card">
+        <div class="calendar-header">
+          <h3>Monthly Performance Calendar</h3>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-secondary" style="padding: 0.3rem 0.8rem;" onclick="changeMonth(-1)">&lt;</button>
+            <span id="calMonthYear" style="font-weight: 700; font-size: 1rem;"></span>
+            <button class="btn btn-secondary" style="padding: 0.3rem 0.8rem;" onclick="changeMonth(1)">&gt;</button>
+          </div>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </div>
     </section>
 
     <!-- TRADE LOG -->
@@ -128,7 +153,7 @@
       <div class="upload-container">
         <div class="drop-box" id="dropZone">
           <h2 style="margin-bottom: 0.5rem;">Webull Statement / CSV Upload</h2>
-          <p style="color: var(--text-sub); margin-bottom: 1rem;">Drag and drop Webull CSVs or GUID exports directly into this box.</p>
+          <p style="color: var(--text-sub); margin-bottom: 1rem;">Drag and drop single/multiple Webull CSVs, GUID exports, or folders here.</p>
           <div class="btn-group">
             <button class="btn" onclick="document.getElementById('fileInput').click()">Select Files</button>
             <button class="btn btn-secondary" onclick="document.getElementById('folderInput').click()">Select Folder</button>
@@ -152,9 +177,10 @@
   </main>
 
   <script>
-    console.log("TradePulse v2.2 Initialized - Build 2026-11-01 21:16 GMT");
+    console.log("TradePulse v2.3 Initialized - Build 2026-11-01 21:20 GMT");
     let trades = JSON.parse(localStorage.getItem('tp_trades') || '[]');
     let equityChart, winLossChart;
+    let currentCalDate = new Date();
 
     document.addEventListener('DOMContentLoaded', () => {
       initCharts();
@@ -212,7 +238,6 @@
         matchFIFOTrades(totalParsedExecutions);
         alert(`Successfully imported ${totalParsedExecutions.length} trade executions across ${files.length} file(s)!`);
         switchTab(null, 'dashboard');
-        // Set active styling on dashboard tab button
         document.querySelectorAll('.nav-btn').forEach(btn => {
           btn.classList.toggle('active', btn.innerText.includes('Dashboard'));
         });
@@ -233,7 +258,7 @@
       });
     }
 
-    // Dynamic Header Webull CSV Parser (Handles title metadata & GUID exports)
+    // Dynamic Header Webull CSV Parser (Handles metadata rows & GUID exports)
     function parseWebullCSV(csvText) {
       const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
       if (lines.length === 0) return [];
@@ -383,6 +408,7 @@
       }
 
       updateCharts(wins.length, losses.length);
+      renderCalendar();
     }
 
     function initCharts() {
@@ -411,6 +437,67 @@
 
       winLossChart.data.datasets[0].data = [winCount, lossCount];
       winLossChart.update();
+    }
+
+    // Calendar Heatmap Logic
+    function changeMonth(delta) {
+      currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      const year = currentCalDate.getFullYear();
+      const month = currentCalDate.getMonth();
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      
+      document.getElementById('calMonthYear').innerText = `${monthNames[month]} ${year}`;
+
+      // Aggregate daily P&L
+      const dailyPnl = {};
+      trades.forEach(t => {
+        if (!t.sellDate || t.sellDate === 'N/A') return;
+        const parts = t.sellDate.split(' ')[0].split('/');
+        if (parts.length === 3) {
+          // Format key YYYY-MM-DD
+          const dStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          dailyPnl[dStr] = (dailyPnl[dStr] || 0) + t.pnl;
+        }
+      });
+
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      const grid = document.getElementById('calendarGrid');
+      grid.innerHTML = '';
+
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      dayNames.forEach(d => {
+        grid.innerHTML += `<div class="cal-day-name">${d}</div>`;
+      });
+
+      for (let i = 0; i < firstDayIndex; i++) {
+        grid.innerHTML += `<div class="cal-day empty"></div>`;
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const pnl = dailyPnl[dKey];
+
+        let dayClass = '';
+        let pnlText = '';
+        if (pnl !== undefined) {
+          if (pnl > 0) { dayClass = 'win-day'; pnlText = `<span class="day-pnl text-green">+$${pnl.toFixed(0)}</span>`; }
+          else if (pnl < 0) { dayClass = 'loss-day'; pnlText = `<span class="day-pnl text-red">-$${Math.abs(pnl).toFixed(0)}</span>`; }
+          else { pnlText = `<span class="day-pnl" style="color:var(--text-sub);">$0</span>`; }
+        }
+
+        grid.innerHTML += `
+          <div class="cal-day ${dayClass}">
+            <div class="date-num">${day}</div>
+            <div>${pnlText}</div>
+          </div>
+        `;
+      }
     }
 
     function parseRawText() {
